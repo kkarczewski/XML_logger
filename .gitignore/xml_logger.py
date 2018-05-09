@@ -8,7 +8,6 @@ import os
 import sys
 import string
 import argparse
-import subprocess
 
 # #############################################################################
 # constants, global variables
@@ -115,3 +114,98 @@ def my_logger(ERROR_FLAG,subcmd,outmsg):
    if not os.path.exists(LOGGER_PATH):
       tree = ET.ElementTree(root)
    tree.write(LOGGER_PATH,encoding=OUTPUT_ENCODING,xml_declaration=True,method='xml')
+
+#Executing bash commands in terminal from python script. Fancy method with asterix as progress bar.
+def os_call(*args,progress_char='*',verbose=1):
+   import time # in case of usege - move on the top of the file to the list of libs in use
+   n = 0
+   done_cmd = list()
+   out = list()
+   for cmd in args:
+      p = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd=DIRECTORY)
+      (output,err) = p.communicate()
+      n = n+1
+      ast = progress_char*n
+      if err or 'ERROR' in str(output) or 'Exception' in str(output):
+         done_cmd.append(cmd)
+         ERROR_FLAG = 'T'
+         print_err(cmd)
+         if err:
+            print_err(err.decode(OUTPUT_ENCODING))
+            out.append(err.decode(OUTPUT_ENCODING))
+            break
+         else:
+            print_err(output.decode(OUTPUT_ENCODING))
+            out.append(output.decode(OUTPUT_ENCODING))
+            break
+      else:
+         ERROR_FLAG = 'F'
+         done_cmd.append(cmd)
+         out.append(output.decode(OUTPUT_ENCODING))
+         if verbose == 2:
+            print(ast,end="\r")
+            time.sleep(1)
+            print_ok(cmd)
+            print_ok(output.decode(OUTPUT_ENCODING))
+         elif verbose == 1:
+            print_ok(output.decode(OUTPUT_ENCODING))
+         else:
+            print(ast,end='\r')
+   return ERROR_FLAG,done_cmd,out
+
+# #############################################################################
+# operations
+# #############################################################################
+
+def opt_test(*lines):
+      ERROR_FLAG,done_cmd,out = os_call(*lines,progress_char='*',verbose=2)
+      my_logger(ERROR_FLAG,done_cmd,out)
+
+def opt_help():
+   parser.print_help()
+   msg = 'Printed help'
+   msg = (base64.b64encode(('Printed help').encode(OUTPUT_ENCODING))).decode(OUTPUT_ENCODING)
+   return msg 
+   # #############################################################################
+# main app 
+# #############################################################################
+if __name__ == '__main__':
+# Reading arguments
+   try:
+      from sqlalchemy.sql import text
+   except Exception as e:
+      print_err('No sqlalchemy installation')
+      print_err(e)
+   parser = argparse.ArgumentParser(
+      prog='template.py',
+      description='Description script',
+      epilog='Epilog script',
+      add_help=True, 
+      argument_default=argparse.SUPPRESS,
+      formatter_class=argparse.RawTextHelpFormatter)
+   parser.add_argument('test',
+      nargs='?',
+      help='Test command that will be logged in xml')
+   subparsers = parser.add_subparsers()
+   parser_subone = subparsers.add_parser('sub-arg',help='Decription subone')
+   parser_subone.add_argument('sub-arg',
+      nargs='?',
+      help='Description subone')
+   argv = sys.argv[1:]
+   args = parser.parse_args(argv)
+   try:
+      if not len(sys.argv) > 1 or 'help' in args:
+         opt_help()
+      elif 'test' in args:
+         opt_test(args.test)
+      else:
+         opt_help()
+   except Exception as e:
+      cmd = str()
+      for one_arg in sys.argv:
+         cmd+=one_arg+' '
+      list_cmd=list()
+      list_cmd.append(cmd)
+      err_msg = str(e)
+      my_logger('T',list_cmd,err_msg)
+      print(e)
